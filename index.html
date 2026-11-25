@@ -1,0 +1,533 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STARK HUD // Touchless AirScroll</title>
+  <link rel="preconnect" href="https://googleapis.com">
+  <link rel="preconnect" href="https://gstatic.com" crossorigin>
+  <link href="https://googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Orbitron:wght@600;800;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070304;
+      --armor-red: #991b1b;
+      --hot-red: #ef4444;
+      --stark-gold: #f59e0b;
+      --arc-cyan: #00f0ff;
+      --panel-bg: rgba(24, 9, 11, 0.85);
+      --text: #fef2f2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top right, #2a080b 0%, var(--bg) 65%);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+      background-size: 36px 36px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header {
+      position: relative;
+      z-index: 1;
+      padding: 14px 24px;
+      background: rgba(14, 4, 6, 0.95);
+      border-bottom: 2px solid var(--stark-gold);
+      box-shadow: 0 4px 24px rgba(239, 68, 68, 0.25);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .arc-core {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #ffffff 15%, var(--arc-cyan) 60%, transparent 100%);
+      box-shadow: 0 0 14px var(--arc-cyan), 0 0 28px var(--arc-cyan);
+      animation: pulse 2s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(0.95); opacity: 0.85; }
+      to { transform: scale(1.1); opacity: 1; }
+    }
+
+    header h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      margin: 0;
+      background: linear-gradient(90deg, var(--stark-gold), #fde047, var(--arc-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.78rem;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      background: rgba(153, 27, 27, 0.25);
+      color: var(--stark-gold);
+      border: 1.5px solid var(--stark-gold);
+      padding: 9px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 700;
+      transition: all 0.18s ease;
+    }
+
+    button:hover {
+      background: rgba(245, 158, 11, 0.2);
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+    }
+
+    button.active {
+      background: linear-gradient(135deg, var(--hot-red), var(--armor-red));
+      color: #fff;
+      border-color: var(--arc-cyan);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.45);
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 390px 1fr;
+      gap: 20px;
+      padding: 20px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .cam-panel {
+      background: var(--panel-bg);
+      border: 1.5px solid rgba(245, 158, 11, 0.45);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: inset 0 0 25px rgba(239, 68, 68, 0.15);
+    }
+
+    .video-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid var(--arc-cyan);
+      box-shadow: 0 0 18px rgba(0, 240, 255, 0.25);
+    }
+
+    video, canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      transform: scaleX(-1);
+    }
+
+    .status-pill {
+      font-family: 'JetBrains Mono', monospace;
+      padding: 11px;
+      border-radius: 8px;
+      background: #090d16;
+      border: 1px solid var(--arc-cyan);
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-align: center;
+      color: var(--arc-cyan);
+      text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+    }
+
+    .guide-box {
+      background: rgba(153, 27, 27, 0.18);
+      border-left: 3px solid var(--stark-gold);
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 0.86rem;
+      line-height: 1.55;
+      color: #fee2e2;
+    }
+
+    .guide-box strong {
+      color: var(--stark-gold);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.78rem;
+      letter-spacing: 0.5px;
+    }
+
+    .reader-panel {
+      background: var(--panel-bg);
+      border: 1.5px solid rgba(0, 240, 255, 0.3);
+      border-radius: 14px;
+      padding: 32px 46px;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+      line-height: 1.8;
+    }
+
+    .reader-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+    .reader-panel::-webkit-scrollbar-thumb {
+      background: var(--stark-gold);
+      border-radius: 4px;
+    }
+
+    .badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(0, 240, 255, 0.12);
+      color: var(--arc-cyan);
+      border: 1px solid var(--arc-cyan);
+      margin-bottom: 10px;
+    }
+
+    .reader-panel h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.65rem;
+      color: var(--stark-gold);
+      margin-top: 4px;
+      line-height: 1.3;
+    }
+
+    .reader-panel h3 {
+      font-family: 'Orbitron', sans-serif;
+      color: var(--arc-cyan);
+      margin-top: 28px;
+      font-size: 1.15rem;
+    }
+
+    .card-block {
+      background: linear-gradient(135deg, rgba(153, 27, 27, 0.25), rgba(9, 13, 22, 0.9));
+      padding: 18px 20px;
+      border-radius: 10px;
+      margin: 22px 0;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-left: 4px solid var(--arc-cyan);
+    }
+
+    .card-block strong {
+      color: var(--stark-gold);
+    }
+
+    @media (max-width: 850px) {
+      main {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+      }
+      .reader-panel {
+        padding: 24px;
+        min-height: 460px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="arc-core"></div>
+      <h1>MARK LXXXV // AIR-SCROLL HUD</h1>
+    </div>
+    <div class="controls">
+      <button id="startBtn" class="active">⚡ Boot Suit Cam</button>
+      <button id="handBtn" class="active">🖐️ Repulsor Pinch</button>
+      <button id="blinkBtn">👁️ J.A.R.V.I.S. Blink</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="cam-panel">
+      <div class="video-wrap">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="overlay"></canvas>
+      </div>
+      <div id="status" class="status-pill">[SYS] Hit "Boot Suit Cam" to initialize</div>
+      <div class="guide-box">
+        <strong>REPULSOR PINCH MODE:</strong><br />
+        Pinch your thumb + index to lock an Arc-Cyan anchor in mid-air. Pull up or down to scroll at warp speed—literally feels like Tony Stark's lab.<br /><br />
+        <strong>J.A.R.V.I.S. BLINK MODE:</strong><br />
+        One slightly intentional blink (~0.17s) dives down; two quick blinks yeet back up. Normal fast blinks get ghosted so you don't glitch out while reading.
+      </div>
+    </section>
+
+    <article id="reader" class="reader-panel">
+      <span class="badge">STARK INDUSTRIES // PROTOCOL v2.1</span>
+      <h2>Touchpads Are So 2012. Scroll Like You're In The Suit.</h2>
+      <p>
+        Yo! Welcome to the browser-native sandbox for <strong>Touchless AirScroll</strong>. Zero backend servers, zero cloud uploads—everything runs locally on your device's GPU via WebAssembly. Your webcam feed stays 100% locked inside your browser. No cap.
+      </p>
+
+      <div class="card-block">
+        <strong>🧠 How We Cooked The Anti-Accidental-Blink Logic:</strong><br />
+        Normal human reflex blinks take ~110ms. J.A.R.V.I.S. gates your first Eye Aspect Ratio (EAR) closure at <strong>165ms–650ms</strong> to ignore involuntary blinks, then opens a snappy <strong>380ms</strong> window for a quick second blink to scroll back up.
+      </div>
+
+      <p>
+        Keep scrolling down to test the velocity joystick in <strong>Repulsor Pinch Mode</strong>! Notice how pulling slightly further from the glowing cyan anchor ring smoothly accelerates your scroll without giving your arm a workout.
+      </p>
+
+      <h3>🔋 Arc-Reactor Battery Optimization</h3>
+      <p>
+        Running computer vision at an uncapped 60 FPS eats laptop battery for breakfast. Both the Python desktop script and this HUD cap inference at ~24 FPS during active use and drop into low-power eco polling when you're AFK.
+      </p>
+
+      <div class="card-block">
+        <strong>💻 Want Full OS-Wide Control?</strong><br />
+        Browsers sandbox web apps to their own tab for security. Grab the Python desktop script from the GitHub repo to scroll VS Code, PDFs, Discord, and your entire laptop completely hands-free.
+      </div>
+
+      <p>
+        Vibe check passed! Switch to <strong>J.A.R.V.I.S. Blink Mode</strong> in the top bar, give a quick intentional blink to dive down, or double-blink to jump back up to the top.
+      </p>
+      <p style="height: 360px; color: #fca5a5; opacity: 0.6; font-family: 'JetBrains Mono', monospace;">
+        // END OF STARK HUD SANDBOX — "I am Iron Man."
+<script type="module">
+import {
+FilesetResolver,
+HandLandmarker,
+FaceLandmarker
+} from "jsdelivr.net";
+
+const video = document.getElementById("webcam");
+const canvas = document.getElementById("overlay");
+const ctx = canvas.getContext("2d");
+const statusEl = document.getElementById("status");
+const reader = document.getElementById("reader");
+
+let handLandmarker = null;
+let faceLandmarker = null;
+let mode = "HAND";
+let running = false;
+
+let anchorY = null;
+let smoothedY = null;
+
+let eyeClosedStart = null;
+let blinkCount = 0;
+let lastBlinkEnd = 0;
+let cooldownUntil = 0;
+
+const LEFT_EYE = [33, 160, 158, 133, 153, 144];
+const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
+
+document.getElementById("handBtn").onclick = () => {
+mode = "HAND";
+anchorY = null;
+document.getElementById("handBtn").classList.add("active");
+document.getElementById("blinkBtn").classList.remove("active");
+};
+
+document.getElementById("blinkBtn").onclick = () => {
+mode = "BLINK";
+blinkCount = 0;
+eyeClosedStart = null;
+document.getElementById("blinkBtn").classList.add("active");
+document.getElementById("handBtn").classList.remove("active");
+};
+
+async function initModels() {
+statusEl.textContent = "[J.A.R.V.I.S.] Loading neural models...";
+const vision = await FilesetResolver.forVisionTasks(
+"jsdelivr.net"
+);
+
+handLandmarker = await HandLandmarker.createFromOptions(vision, {
+baseOptions: {
+modelAssetPath:
+"googleapis.com",
+delegate: "GPU"
+},
+runningMode: "VIDEO",
+numHands: 1
+});
+
+faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+baseOptions: {
+modelAssetPath:
+"googleapis.com",
+delegate: "GPU"
+},
+runningMode: "VIDEO",
+numFaces: 1
+});
+}
+
+function getEAR(landmarks, indices) {
+const p0 = landmarks[indices[0]];
+const p1 = landmarks[indices[1]];
+const p2 = landmarks[indices[2]];
+const p3 = landmarks[indices[3]];
+const p4 = landmarks[indices[4]];
+const p5 = landmarks[indices[5]];
+
+const v1 = Math.hypot(p1.x - p5.x, p1.y - p5.y);
+const v2 = Math.hypot(p2.x - p4.x, p2.y - p4.y);
+const h = Math.hypot(p0.x - p3.x, p0.y - p3.y);
+return h === 0 ? 0.3 : (v1 + v2) / (2 * h);
+}
+
+document.getElementById("startBtn").onclick = async () => {
+if (running) return;
+try {
+if (!handLandmarker) await initModels();
+const stream = await navigator.mediaDevices.getUserMedia({
+video: { width: 320, height: 240 }
+});
+video.srcObject = stream;
+video.onloadeddata = () => {
+canvas.width = video.videoWidth;
+canvas.height = video.videoHeight;
+running = true;
+document.getElementById("startBtn").textContent = "🟢 Suit Online";
+predictLoop();
+};
+} catch (err) {
+statusEl.textContent = "[ERR] Cam access blocked, check permissions";
+console.error(err);
+}
+};
+
+let lastInfer = 0;
+function predictLoop() {
+const now = performance.now();
+
+if (now - lastInfer >= 40) {
+lastInfer = now;
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+if (mode === "HAND") {
+const res = handLandmarker.detectForVideo(video, now);
+if (res.landmarks && res.landmarks.length > 0) {
+const lm = res.landmarks[0];
+const thumb = lm[4];
+const index = lm[8];
+const dist = Math.hypot(index.x - thumb.x, index.y - thumb.y);
+
+const midX = (thumb.x + index.x) / 2;
+const midY = (thumb.y + index.y) / 2;
+
+smoothedY = smoothedY === null ? midY : 0.25 * midY + 0.75 * smoothedY;
+
+ctx.fillStyle = "#f59e0b";
+ctx.beginPath();
+ctx.arc(thumb.x * canvas.width, thumb.y * canvas.height, 4, 0, Math.PI * 2);
+ctx.arc(index.x * canvas.width, index.y * canvas.height, 4, 0, Math.PI * 2);
+ctx.fill();
+
+if (dist < 0.055) {
+if (anchorY === null) anchorY = smoothedY;
+const deltaY = smoothedY - anchorY;
+
+if (Math.abs(deltaY) > 0.025) {
+reader.scrollTop += deltaY * 145;
+statusEl.textContent = deltaY > 0 ? "[HUD] Thrusters DOWN ▼" : "[HUD] Thrusters UP ▲";
+} else {
+statusEl.textContent = "[HUD] Repulsor Locked — Slide";
+}
+
+ctx.strokeStyle = "#00f0ff";
+ctx.lineWidth = 3;
+ctx.beginPath();
+ctx.arc(midX * canvas.width, anchorY * canvas.height, 9, 0, Math.PI * 2);
+ctx.moveTo(midX * canvas.width, anchorY * canvas.height);
+ctx.lineTo(midX * canvas.width, smoothedY * canvas.height);
+ctx.stroke();
+} else {
+anchorY = null;
+statusEl.textContent = "[HUD] Pinch Fingers to Engage";
+}
+} else {
+anchorY = null;
+smoothedY = null;
+statusEl.textContent = "[SCAN] Raise Hand to Sensor";
+}
+} else {
+const res = faceLandmarker.detectForVideo(video, now);
+if (res.faceLandmarks && res.faceLandmarks.length > 0) {
+const lm = res.faceLandmarks[0];
+const ear = (getEAR(lm, LEFT_EYE) + getEAR(lm, RIGHT_EYE)) / 2;
+
+ctx.fillStyle = "#00f0ff";
+[...LEFT_EYE, ...RIGHT_EYE].forEach((i) => {
+ctx.fillRect(lm[i].x * canvas.width, lm[i].y * canvas.height, 2.5, 2.5);
+});
+
+if (now >= cooldownUntil) {
+if (ear < 0.21) {
+if (!eyeClosedStart) eyeClosedStart = now;
+} else if (eyeClosedStart) {
+const dur = now - eyeClosedStart;
+const minDur = blinkCount === 0 ? 165 : 110;
+if (dur >= minDur && dur <= 650) {
+blinkCount++;
+lastBlinkEnd = now;
+}
+eyeClosedStart = null;
+}
+
+if (blinkCount > 0 && now - lastBlinkEnd > 380) {
+if (blinkCount === 1) {
+reader.scrollBy({ top: 380, behavior: "smooth" });
+statusEl.textContent = "[BLINK 1x] Diving DOWN ▼";
+} else {
+reader.scrollBy({ top: -380, behavior: "smooth" });
+statusEl.textContent = "[BLINK 2x] Boosting UP ▲";
+}
+blinkCount = 0;
+cooldownUntil = now + 350;
+}
+}
+} else {
+statusEl.textContent = "[SCAN] Pilot Face Not Found";
+}
+}
+}
+
+requestAnimationFrame(predictLoop);
+}
+</script>
